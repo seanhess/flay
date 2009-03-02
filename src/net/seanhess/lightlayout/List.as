@@ -252,6 +252,9 @@ public class List extends SBox
     	else if (item.hasOwnProperty("id"))
     		return item.id;
     		
+    	else if (item is Array || item is ArrayCollection)
+    		throw new Error("You have a nested array");
+    		
     	else
     		return item;
     }
