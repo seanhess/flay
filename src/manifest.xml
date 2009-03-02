@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<componentPackage>    
+	<component class="net.seanhess.lightlayout.FlowLayout"/>
+	<component class="net.seanhess.lightlayout.ISBoxLayout"/>
+	<component class="net.seanhess.lightlayout.List"/>
+	<component class="net.seanhess.lightlayout.RendererInfo"/>
+	<component class="net.seanhess.lightlayout.SBox"/>
+	<component class="net.seanhess.lightlayout.StandardLayout"/>
+</componentPackage>

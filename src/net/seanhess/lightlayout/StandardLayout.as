@@ -1,4 +1,4 @@
-package com.lightlayout
+package net.seanhess.lightlayout
 {
 	public class StandardLayout implements ISBoxLayout
 	{

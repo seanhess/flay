@@ -1,4 +1,4 @@
-package com.lightlayout
+package net.seanhess.lightlayout
 {
 	import mx.core.IChildList;
 	

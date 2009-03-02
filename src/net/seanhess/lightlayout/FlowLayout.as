@@ -1,4 +1,4 @@
-package com.lightlayout
+package net.seanhess.lightlayout
 {
 	import flash.display.DisplayObject;
 	
@@ -23,7 +23,6 @@ package com.lightlayout
 			
 			var widthValue:Number = (direction == "horizontal") ? width : height;
 			
-			var padding:Number = this.padding;
 			var offsetMajor:Number = outerPadding;
 			var offsetMinor:Number = outerPadding;
 			var rowSize:Number = 0;
@@ -43,7 +42,7 @@ package com.lightlayout
 				if (child[heightProp] > rowSize)
 					rowSize = child[heightProp];
 				
-				offsetMajor += child[widthProp] + padding;	
+				offsetMajor += child[widthProp] + innerPadding;	
 			}
 		}
 	}

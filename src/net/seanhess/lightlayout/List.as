@@ -1,4 +1,4 @@
-package com.lightlayout
+package net.seanhess.lightlayout
 {
 	
 import flash.utils.Dictionary;
@@ -8,6 +8,7 @@ import mx.controls.Label;
 import mx.core.ClassFactory;
 import mx.core.IDataRenderer;
 import mx.core.IFactory;
+import mx.core.IUID;
 import mx.core.UIComponent;
 import mx.events.CollectionEvent;
 import mx.events.CollectionEventKind; 
@@ -23,8 +24,13 @@ import mx.events.CollectionEventKind;
  * 
  * Be sure to set the dataProvider to an array or ArrayCollection. 
  */
-public class LightList extends SBox
+public class List extends SBox
 {
+	/**
+	 * Information passed through to each renderer
+	 */
+	public var resource:Object;
+	
 	/**
 	 * The item renderer to create for each item
 	 */
@@ -136,40 +142,53 @@ public class LightList extends SBox
 		}
     }
     
-    protected function updateData(renderer:UIComponent, item:Object):void
+    protected function updateData(renderer:IDataRenderer, item:Object):void
     {
-    	if (renderer is IDataRenderer)
-			(renderer as IDataRenderer).data = item;
+    	if (renderer.data == null)
+    		throw new Error("Renderer data was not set. Error in LightList");
+    		
+		(renderer.data as RendererInfo).source = item;
     }
     
     protected function add(item:Object, renderer:UIComponent, location:int):void
     {
-		updateData(renderer, item);
+    	itemRenderers[itemKey(item)] = renderer;
+    			
+		var info:RendererInfo = new RendererInfo();
+			info.odd = ((location % 2) == 1);
+			info.source = item;
+			info.resource = resource;
+			
+    	(renderer as IDataRenderer).data = info;
+		
 		addChildAt(renderer, location);
-		itemRenderers[item] = renderer;
     }
     
     protected function remove(renderer:UIComponent):void
     {    	
-    	updateData(renderer, null);
+    	updateData(renderer as IDataRenderer, null);
+    	
     	if (this.contains(renderer))
     		removeChildAt(getChildIndex(renderer));	
     }
     
     protected function moved(oldLocation:int, newLocation:int):void
     {    	
-    	// move the renderer // 
     	var renderer:UIComponent = getChildAt(oldLocation) as UIComponent;
-    	
     	setChildIndex(renderer, newLocation);
+    	
+    	// update all the indices! // 
+		for (var i:int = 0; i < collection.length; i++)
+		{
+			var item:Object = collection.getItemAt(i);
+			((itemRenderers[itemKey(item)] as IDataRenderer).data as RendererInfo).odd = ((i % 2) == 1);
+		}
     }
     
     protected function replace(location:int):void
     {
     	var renderer:UIComponent = getChildAt(location) as UIComponent;
-    		
-    	if (renderer is IDataRenderer)
-			(renderer as IDataRenderer).data = collection.getItemAt(location);
+    	updateData(renderer as IDataRenderer, collection.getItemAt(location));
     }
     
     protected function differentialBuild():void
@@ -182,17 +201,17 @@ public class LightList extends SBox
 			var item:Object = collection.getItemAt(i);
 			
 			// If it doesn't have a renderer ... create it (in the right place!)// 
-			if (!itemRenderers[item])
+			if (!itemRenderers[itemKey(item)])
 			{
 				add(item, createRenderer(), i);
 			}
 			
 			// We've cleared this renderer // 
-			checkedRenderers[itemRenderers[item]] = true; 
+			checkedRenderers[itemRenderers[itemKey(item)]] = true; 
 		}
 		
 		// Scan through the renderers, looking for removes
-		for each (var existingRenderer:UIComponent in itemRenderers)
+		for each (var existingRenderer:UIComponent in this.getChildren())
 		{
 			// remove any that weren't checked // 
 			if (!checkedRenderers[existingRenderer])
@@ -204,7 +223,7 @@ public class LightList extends SBox
     
     protected function reset():void
     {
-    	itemRenderers = new Dictionary(true);
+    	init();
     	this.removeAllChildren();
     	
     	var i:int = 0;
@@ -217,13 +236,24 @@ public class LightList extends SBox
     
     protected function init():void
     {
-		if (!itemRenderers)
-			itemRenderers = new Dictionary(true);
+		itemRenderers = new Dictionary(true);
     }		
     
     protected function createRenderer():UIComponent
     {
     	return itemRenderer.newInstance() as UIComponent;
+    }
+    
+    protected function itemKey(item:Object):Object
+    {
+    	if (item is IUID)
+    		return (item as IUID).uid;
+    		
+    	else if (item.hasOwnProperty("id"))
+    		return item.id;
+    		
+    	else
+    		return item;
     }
     			
 
@@ -231,7 +261,7 @@ public class LightList extends SBox
 	 * Internal list of itemRenderers
 	 */
 	protected var itemRenderers:Dictionary;
-
+	
 	/**
 	 * Defer updates to the list
 	 */
