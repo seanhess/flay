@@ -1,4 +1,4 @@
-package net.seanhess.lightlayout
+package net.seanhess.flay.layout
 {
 	import mx.core.IChildList;
 	

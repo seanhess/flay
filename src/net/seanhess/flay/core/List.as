@@ -1,9 +1,12 @@
-package net.seanhess.lightlayout
+package net.seanhess.flay.core
 {
 	
+import flash.display.DisplayObject;
 import flash.utils.Dictionary;
+import flash.utils.getDefinitionByName;
 
 import mx.collections.ArrayCollection;
+import mx.collections.IList;
 import mx.controls.Label;
 import mx.core.ClassFactory;
 import mx.core.IDataRenderer;
@@ -32,12 +35,41 @@ public class List extends SBox
 	public var resource:Object;
 	
 	/**
+	 * Recycled renderers
+	 */
+	protected var recycle:Array;
+	
+	/**
 	 * The item renderer to create for each item
 	 */
-	public var itemRenderer:IFactory = new ClassFactory(Label); 
+	public function set itemRenderer(value:Object):void
+	{
+		if (value is String)
+			value = new ClassFactory(getDefinitionByName(value as String) as Class);
+		
+		else if (value is Class)
+			value = new ClassFactory(value as Class);
+			
+		if (value is IFactory)
+			renderer = value as IFactory;
+		
+		else 
+			throw new Error("item Renderer was not a class or factory");
+			
+		recycle = [];
+	} 
+	
+	public function get itemRenderer():Object
+	{
+		return renderer;
+	}
+	
+	public var renderer:IFactory = new ClassFactory(Label); 
 		
 	/**
-	 * Returns all the renderers, referenced by item
+	 * Returns all the renderers, referenced by item. These 
+	 * are renderers that are actually in the list, displayed
+	 * and have data associated with them
 	 */
 	public function get renderers():Dictionary
 	{
@@ -64,9 +96,9 @@ public class List extends SBox
 	        collection = new ArrayCollection(value as Array);
 	    }
 	    
-	    else if (value is ArrayCollection)
+	    else if (value is IList)
 	    {
-	    	collection = value as ArrayCollection;
+	    	collection = value as IList;
 	    }
 
 	    collection.addEventListener(CollectionEvent.COLLECTION_CHANGE, onCollectionChange, false, 0, true);
@@ -78,12 +110,14 @@ public class List extends SBox
 	}
 	
 	
-	
 	/**
 	 * Defer changes, and save them
 	 */
     protected function onCollectionChange(event:CollectionEvent):void
     {
+    	if (event.kind == CollectionEventKind.UPDATE)
+    		return;
+    	
     	collectionChange = true;
     	changes.push(event);
     	invalidateProperties();
@@ -91,6 +125,10 @@ public class List extends SBox
     
     /**
     * Make the change for each one that has happened since we last checked
+    * 
+    * If there was only one change, then perform it.
+    * 
+    * Otherwise, just do a full reset
     */
     override protected function commitProperties():void
     {
@@ -99,13 +137,18 @@ public class List extends SBox
     	if (collectionChange)
     	{
     		collectionChange = false;
-    		init();
     		
-    		for each (var change:CollectionEvent in changes)
+    		if (changes.length > 0)
     		{
-    			makeChange(change);
+	    		if (changes.length == 1)
+	    			makeChange(changes.pop());
+	    			
+	    		else
+	    		{
+	    			makeChange(new CollectionEvent(CollectionEvent.COLLECTION_CHANGE, false, false, CollectionEventKind.RESET));
+	    		}
     		}
-    		
+    			
     		changes = []; 
     	}
     }
@@ -118,12 +161,10 @@ public class List extends SBox
     	switch(changeEvent.kind)
 		{
 			case CollectionEventKind.ADD:
-				var item:Object = collection.getItemAt(changeEvent.location);
-				add(item, createRenderer(), changeEvent.location);
+				addChange(changeEvent);
 				break;
 			case CollectionEventKind.REMOVE:
-		    	var renderer:UIComponent = getChildAt(changeEvent.location) as UIComponent;
-				remove(renderer);
+				removeChange(changeEvent);
 				break;
 			case CollectionEventKind.MOVE:
 				moved(changeEvent.oldLocation, changeEvent.location);
@@ -134,18 +175,58 @@ public class List extends SBox
 			case CollectionEventKind.RESET:
 				reset();
 				break;
+			case CollectionEventKind.UPDATE:	// update doesn't need to do anything
+				break;
 			case CollectionEventKind.REFRESH:
-			case CollectionEventKind.UPDATE:
 			default:
 				differentialBuild();
 				break;
 		}
     }
     
+    protected function addChange(event:CollectionEvent):void
+    {
+    	eachItemMatched(event, function(item:*, index:int):void {
+    		if (index > -1)							// something weird is going on otherwise
+    			add(item, getRenderer(), index);
+    	});
+    }
+    
+    protected function removeChange(event:CollectionEvent):void
+    {
+    	eachItemMatched(event, function(item:*, index:int):void {
+			remove(itemRenderers[itemKey(item)]);
+    	});
+    }
+    
+    protected function eachItemMatched(event:CollectionEvent, callback:Function):void
+    {
+    	var items:Array = event.items;
+    	
+    	var i:int = 0;
+    	while(i < items.length)
+    	{
+    		var item:* = items[i++];
+    		
+    		try
+    		{
+	    		var index:int = collection.getItemIndex(item);
+	    		callback(item, index);
+    		}
+    		catch (e:Error)
+    		{
+    			continue; 	// skip out!
+    		}
+    	}
+    }
+    
     protected function updateData(renderer:IDataRenderer, item:Object):void
     {
+    	if (renderer == null)
+    		throw new Error("Renderer was null. Error in Flay.List");
+    	
     	if (renderer.data == null)
-    		throw new Error("Renderer data was not set. Error in LightList");
+    		throw new Error("Renderer data was not set. Error in Flay.List");
     		
 		(renderer.data as RendererInfo).source = item;
     }
@@ -166,10 +247,23 @@ public class List extends SBox
     
     protected function remove(renderer:UIComponent):void
     {    	
-    	updateData(renderer as IDataRenderer, null);
-    	
+    	if (renderer == null)
+    		return;
+    		
+    	var info:RendererInfo = renderer["data"] as RendererInfo;
+    		
     	if (this.contains(renderer))
-    		removeChildAt(getChildIndex(renderer));	
+    	{
+    		removeChild(renderer);	
+			recycle.push(renderer);
+    	}
+    	
+    	if (info && info.source)
+    	{
+    		delete itemRenderers[info.source];
+    	}
+    	
+    	updateData(renderer as IDataRenderer, null);
     }
     
     protected function moved(oldLocation:int, newLocation:int):void
@@ -203,7 +297,7 @@ public class List extends SBox
 			// If it doesn't have a renderer ... create it (in the right place!)// 
 			if (!itemRenderers[itemKey(item)])
 			{
-				add(item, createRenderer(), i);
+				add(item, getRenderer(), i);
 			}
 			
 			// We've cleared this renderer // 
@@ -224,12 +318,17 @@ public class List extends SBox
     protected function reset():void
     {
     	init();
-    	this.removeAllChildren();
+    	
+    	for each (var renderer:DisplayObject in this.getChildren())
+    	{
+    		removeChild(renderer);
+    		recycle.push(renderer);
+    	}
     	
     	var i:int = 0;
     	for each (var item:Object in collection)
     	{
-    		add(item, createRenderer(), i);
+    		add(item, getRenderer(), i);
     		i++; 
     	}
     }
@@ -239,9 +338,26 @@ public class List extends SBox
 		itemRenderers = new Dictionary(true);
     }		
     
+    /**
+    * Actually creates a renderer
+    */
     protected function createRenderer():UIComponent
     {
-    	return itemRenderer.newInstance() as UIComponent;
+    	return renderer.newInstance() as UIComponent;
+    }
+    
+    /**
+    * Returns a renderer from the recycle pile if there are any
+    * or creates one
+    */
+    protected function getRenderer():UIComponent
+    {
+    	var renderer:UIComponent = recycle.pop();
+    	
+    	if (renderer == null)
+    		renderer = createRenderer();
+    	
+    	return renderer;
     }
     
     protected function itemKey(item:Object):Object
@@ -252,7 +368,7 @@ public class List extends SBox
     	else if (item.hasOwnProperty("id"))
     		return item.id;
     		
-    	else if (item is Array || item is ArrayCollection)
+    	else if (item is Array || item is IList)
     		throw new Error("You have a nested array");
     		
     	else
@@ -263,7 +379,7 @@ public class List extends SBox
 	/**
 	 * Internal list of itemRenderers
 	 */
-	protected var itemRenderers:Dictionary;
+	protected var itemRenderers:Dictionary = new Dictionary(true);
 	
 	/**
 	 * Defer updates to the list
@@ -278,7 +394,7 @@ public class List extends SBox
 	/**
 	 * The data internally
 	 */
-    protected var collection:ArrayCollection;
+    protected var collection:IList;
     
 
 	

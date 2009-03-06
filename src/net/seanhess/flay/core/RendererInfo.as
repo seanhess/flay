@@ -1,4 +1,4 @@
-package net.seanhess.lightlayout
+package net.seanhess.flay.core
 {
 	[Bindable]
 	public class RendererInfo

@@ -1,6 +1,9 @@
-package net.seanhess.lightlayout
+package net.seanhess.flay.core
 {
 	import mx.core.LayoutContainer;
+	
+	import net.seanhess.flay.layout.ISBoxLayout;
+	import net.seanhess.flay.layout.StandardLayout;
 	
 	/**
 	 * Superbox! It extends LayoutContainer, making it easier to access, but also allows for externally
