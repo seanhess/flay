@@ -117,6 +117,9 @@ public class List extends SBox
     {
     	if (event.kind == CollectionEventKind.UPDATE)
     		return;
+    		
+    	else if (event.kind == CollectionEventKind.RESET)
+    		hardReset = true;
     	
     	collectionChange = true;
     	changes.push(event);
@@ -143,12 +146,18 @@ public class List extends SBox
 	    		if (changes.length == 1)
 	    			makeChange(changes.pop());
 	    			
-	    		else
+	    		else if (hardReset)
 	    		{
 	    			makeChange(new CollectionEvent(CollectionEvent.COLLECTION_CHANGE, false, false, CollectionEventKind.RESET));
 	    		}
+	    			
+	    		else
+	    		{
+	    			makeChange(new CollectionEvent(CollectionEvent.COLLECTION_CHANGE, false, false, CollectionEventKind.REFRESH));
+	    		}
     		}
     			
+    		hardReset = false;
     		changes = []; 
     	}
     }
@@ -390,6 +399,11 @@ public class List extends SBox
 	 * List of changes since last update
 	 */
 	protected var changes:Array = [];
+	
+	/**
+	 * Whether or not we've had a hard reset come through
+	 */
+	protected var hardReset:Boolean = false;
 	
 	/**
 	 * The data internally
