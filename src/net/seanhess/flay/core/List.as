@@ -14,7 +14,8 @@ import mx.core.IFactory;
 import mx.core.IUID;
 import mx.core.UIComponent;
 import mx.events.CollectionEvent;
-import mx.events.CollectionEventKind; 
+import mx.events.CollectionEventKind;
+import mx.events.PropertyChangeEvent; 
 
 /**
  * LightList creates a component for each item in the data provider. It doesn't
@@ -100,9 +101,14 @@ public class List extends SBox
 	    {
 	    	collection = value as IList;
 	    }
-
-	    collection.addEventListener(CollectionEvent.COLLECTION_CHANGE, onCollectionChange, false, 0, true);
-		
+	    
+	    if (value)
+	    {
+		    collection.addEventListener(CollectionEvent.COLLECTION_CHANGE, onCollectionChange, false, 0, true);
+	    }
+	    else
+	    	collection = null;
+	    	
 		var event:CollectionEvent = new CollectionEvent(CollectionEvent.COLLECTION_CHANGE);
 			event.kind = CollectionEventKind.RESET;
 
@@ -115,10 +121,12 @@ public class List extends SBox
 	 */
     protected function onCollectionChange(event:CollectionEvent):void
     {
-    	if (event.kind == CollectionEventKind.UPDATE)
-    		return;
+//    	trace("COLLECITON CHANGE || " + this.collection.length+ " || " + event.kind + " || " + event.location);
+    	
+//    	if (event.kind == CollectionEventKind.UPDATE)
+//    		return;
     		
-    	else if (event.kind == CollectionEventKind.RESET)
+    	if (event.kind == CollectionEventKind.RESET)
     		hardReset = true;
     	
     	collectionChange = true;
@@ -185,6 +193,7 @@ public class List extends SBox
 				reset();
 				break;
 			case CollectionEventKind.UPDATE:	// update doesn't need to do anything
+				update(changeEvent.items);
 				break;
 			case CollectionEventKind.REFRESH:
 			default:
@@ -294,6 +303,18 @@ public class List extends SBox
     	updateData(renderer as IDataRenderer, collection.getItemAt(location));
     }
     
+    protected function update(items:Array):void
+    {
+    	for each (var event:PropertyChangeEvent in items)
+    	{
+    		var item:Object = event.source;
+	    	var renderer:UIComponent = itemRenderers[itemKey(item)] as UIComponent;
+	    	
+	    	if (renderer)
+    			updateData(renderer as IDataRenderer, item);
+    	}
+    }
+    
     protected function differentialBuild():void
     {
 		var checkedRenderers:Dictionary = new Dictionary(true);
@@ -371,10 +392,12 @@ public class List extends SBox
     
     protected function itemKey(item:Object):Object
     {
-    	if (item is IUID)
-    		return (item as IUID).uid;
+    	var id:* = item.id;
+    	
+    	if (item is IUID && item.uid != null)
+    		return item.uid;
     		
-    	else if (item.hasOwnProperty("id"))
+    	else if (item.hasOwnProperty("id") && item.id != null)
     		return item.id;
     		
     	else if (item is Array || item is IList)
@@ -396,9 +419,40 @@ public class List extends SBox
 	protected var collectionChange:Boolean = false;
 	
 	/**
-	 * List of changes since last update
+	 * Lists to track collection changes
 	 */
-	protected var changes:Array = [];
+	public var changes:Array = [];
+//	protected var updates:Dictionary = new Dictionary(true); // updates and replaces?
+//	protected var add:Dictionary = new Dictionary(true);
+//	protected var remove:Dictionary = new Dictionary(true);
+//	protected var move:Dictionary = new Dictionary(true); // hmm... how to keep track?
+//	
+//	protected var refresh:Boolean = false;
+//	protected var reset:Boolean = false;
+	
+//	
+//	case CollectionEventKind.ADD:
+//		addChange(changeEvent);
+//		break;
+//	case CollectionEventKind.REMOVE:
+//		removeChange(changeEvent);
+//		break;
+//	case CollectionEventKind.MOVE:
+//		moved(changeEvent.oldLocation, changeEvent.location);
+//		break;
+//	case CollectionEventKind.REPLACE:
+//		replace(changeEvent.location);
+//		break;
+//	case CollectionEventKind.RESET:
+//		reset();
+//		break;
+//	case CollectionEventKind.UPDATE:	// update doesn't need to do anything
+//		update(changeEvent.items);
+//		break;
+//	case CollectionEventKind.REFRESH:
+//	default:
+//		differentialBuild();
+//		break;
 	
 	/**
 	 * Whether or not we've had a hard reset come through
